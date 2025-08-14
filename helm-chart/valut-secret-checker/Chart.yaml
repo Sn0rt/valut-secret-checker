@@ -1,0 +1,16 @@
+apiVersion: v2
+name: valut-secret-checker
+description: A Helm chart for Vault Secret Checker Next.js application
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+maintainers:
+  - name: guohao
+keywords:
+  - nextjs
+  - vault
+  - secret-checker
+  - web-app
+home: ""
+sources:
+  - ""
