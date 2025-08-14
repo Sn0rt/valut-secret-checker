@@ -69,6 +69,7 @@ tolerations: []
 affinity: {}
 
 # Environment variables
-env: {}
+env:
+  VAULT_ENDPOINTS: "http://localhost:8200,https://vault.prod.com,https://vault.staging.com"
+  # Add more environment variables as needed
   # NODE_ENV: production
-  # NEXT_PUBLIC_API_URL: "https://api.example.com"

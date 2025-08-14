@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Info } from 'lucide-react';
 
 interface VaultCredentials {
@@ -51,6 +52,11 @@ function useLocalStorage(key: string, initialValue: string) {
 }
 
 export default function Home() {
+  const [availableEndpoints, setAvailableEndpoints] = useState<string[]>([
+    "http://localhost:8200"
+  ]);
+  const [endpoint, setEndpoint] = useState<string>('');
+
   // Use localStorage for non-sensitive fields
   const [storedEndpoint, setStoredEndpoint] = useLocalStorage('vault-endpoint', 'http://localhost:8200');
   const [storedAccessId, setStoredAccessId] = useLocalStorage('vault-accessId', '');
@@ -67,6 +73,11 @@ export default function Home() {
     authMethod: storedAuthMethod as 'approle' | 'userpass'
   });
 
+  // Initialize endpoint state
+  useEffect(() => {
+    setEndpoint(storedEndpoint);
+  }, [storedEndpoint]);
+
   const [loading, setLoading] = useState<{
     login?: boolean;
     lookup?: boolean;
@@ -75,17 +86,37 @@ export default function Home() {
 
   const [token, setToken] = useState<string>('');
 
+  // Load available endpoints from server
+  useEffect(() => {
+    const loadEndpoints = async () => {
+      try {
+        const response = await axios.get('/api/vault/endpoints');
+        if (response.data.success) {
+          setAvailableEndpoints(response.data.endpoints);
+        }
+      } catch (error) {
+        console.warn('Failed to load endpoints from server, using defaults:', error);
+      }
+    };
+    loadEndpoints();
+  }, []);
+
   // Sync credentials with localStorage values when they change
   useEffect(() => {
     setCredentials(prev => ({
       ...prev,
-      endpoint: storedEndpoint,
+      endpoint: endpoint,
       accessId: storedAccessId,
       secretPath: storedSecretPath,
       keyName: storedKeyName,
       authMethod: storedAuthMethod as 'approle' | 'userpass'
     }));
-  }, [storedEndpoint, storedAccessId, storedSecretPath, storedKeyName, storedAuthMethod]);
+  }, [endpoint, storedAccessId, storedSecretPath, storedKeyName, storedAuthMethod]);
+
+  const handleEndpointChange = (value: string) => {
+    setEndpoint(value);
+    setStoredEndpoint(value);
+  };
 
   const showJsonToast = (title: string, data: unknown, isSuccess: boolean = true) => {
     if (isSuccess) {
@@ -97,7 +128,7 @@ export default function Home() {
               style={{
                 backgroundColor: 'transparent',
                 fontSize: '12px',
-                '--w-rjv-font-family': 'Monaco, Menlo, monospace',
+                '--w-rjv-font-family': 'var(--font-geist-mono), Monaco, Menlo, monospace',
                 '--w-rjv-color-default': '#374151',
                 '--w-rjv-color-string': '#059669',
                 '--w-rjv-color-number': '#dc2626',
@@ -287,13 +318,15 @@ export default function Home() {
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-2">
-                    <Label htmlFor="endpoint">Endpoint</Label>
-                    <Input
-                      id="endpoint"
-                      type="url"
-                      placeholder="http://localhost:8200"
-                      value={credentials.endpoint}
-                      onChange={(e) => handleInputChange('endpoint', e.target.value)}
+                    <Label htmlFor="endpoint-select">Vault Endpoint</Label>
+                    <Combobox
+                      options={availableEndpoints}
+                      value={endpoint}
+                      onValueChange={handleEndpointChange}
+                      placeholder="Select or enter vault endpoint..."
+                      emptyText="No endpoints found. Type to add custom endpoint."
+                      allowCustom={true}
+                      className="w-full"
                     />
                   </div>
                 </CardContent>
