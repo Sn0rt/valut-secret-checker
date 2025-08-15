@@ -12,7 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
 import { Info } from 'lucide-react';
-import { getVaultEndpoints } from '@/lib/vault-config';
+import { getVaultEndpoints, getAppTitle } from '@/lib/vault-config';
 
 interface VaultCredentials {
   endpoint: string;
@@ -54,7 +54,7 @@ function useLocalStorage(key: string, initialValue: string) {
 
 export default function Home() {
   // Get the app title from environment variable or use default
-  const appTitle = process.env.NEXT_PUBLIC_APP_TITLE || "HashiCorp Vault Credential Validator";
+  const appTitle = getAppTitle();
 
   // Get endpoints from environment variable
   const vaultEndpoints = getVaultEndpoints();
@@ -429,7 +429,7 @@ export default function Home() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-end">
+                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
                         <Label htmlFor="secret-path">Secret Path</Label>
@@ -438,14 +438,17 @@ export default function Home() {
                             <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>Enter the path that comes after &apos;secret/&apos; in Vault. For example, if your full path is &apos;secret/myapp/config&apos;, enter &apos;myapp/config&apos;.</p>
+                            <p>
+                              <strong>Absolute path:</strong> Start with &apos;/&apos; to use the full path (e.g., &apos;/v1/secret/data/myapp/config&apos;).<br />
+                              <strong>Relative path:</strong> Enter path after &apos;secret/&apos; (e.g., &apos;myapp/config&apos; becomes &apos;/v1/secret/data/myapp/config&apos;).
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="secret-path"
                         type="text"
-                        placeholder="myapp/config"
+                        placeholder="myapp/config or /v1/secret/data/myapp/config"
                         value={credentials.secretPath}
                         onChange={(e) => handleInputChange('secretPath', e.target.value)}
                       />
@@ -472,17 +475,29 @@ export default function Home() {
                       />
                     </div>
 
-                    <div>
+                    <div className="flex flex-col justify-end h-full">
                       <Button
                         onClick={testGetSecret}
                         disabled={loading.getSecret || !token}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white"
+                        className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6"
                       >
                         {loading.getSecret && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
                         Get Secret Value
                       </Button>
                     </div>
                   </div>
+                  {credentials.secretPath && credentials.endpoint ? (
+                    <div className="mt-4 text-xs text-muted-foreground p-3 bg-blue-50 rounded-md border border-blue-200">
+                      <div className="font-medium text-blue-800 mb-1">Final URL Preview:</div>
+                      <div className="font-mono text-blue-700 break-all">
+                        {credentials.endpoint.endsWith('/') ? credentials.endpoint.slice(0, -1) : credentials.endpoint}
+                        {credentials.secretPath.startsWith('/')
+                          ? credentials.secretPath
+                          : `/v1/secret/data/${credentials.secretPath}`
+                        }
+                      </div>
+                    </div>
+                  ) : null}
                 </CardContent>
               </Card>
 

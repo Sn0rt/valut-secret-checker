@@ -14,9 +14,16 @@ export async function POST(request: NextRequest) {
     }
 
     const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
-    // Ensure secretPath doesn't start with slash for proper URL construction
-    const cleanSecretPath = secretPath.startsWith('/') ? secretPath.substring(1) : secretPath;
-    const secretUrl = `${vaultUrl}/v1/secret/data/${cleanSecretPath}`;
+    
+    let secretUrl: string;
+    if (secretPath.startsWith('/')) {
+      // Absolute path: append directly to endpoint
+      secretUrl = `${vaultUrl}${secretPath}`;
+    } else {
+      // Relative path: use existing logic with /v1/secret/data/ prefix
+      const cleanSecretPath = secretPath;
+      secretUrl = `${vaultUrl}/v1/secret/data/${cleanSecretPath}`;
+    }
 
     const response = await axiosInstance.get(secretUrl, {
       timeout: 10000,
@@ -35,7 +42,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          secretPath: cleanSecretPath,
+          secretPath: secretPath,
           keyName,
           keyValue: keyValue !== undefined ? keyValue : null,
           keyExists: keyValue !== undefined,
@@ -53,7 +60,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         data: {
-          secretPath: cleanSecretPath,
+          secretPath: secretPath,
           allSecrets: secretData,
           allKeys: Object.keys(secretData),
           totalKeys: Object.keys(secretData).length,

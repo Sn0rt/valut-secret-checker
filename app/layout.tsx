@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
 import { Toaster } from "@/components/ui/sonner";
+import { getAppTitle } from "@/lib/vault-config";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -16,7 +17,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: process.env.NEXT_PUBLIC_APP_TITLE || "HashiCorp Vault Credential Validator",
+  title: getAppTitle(),
   description: "Validate HashiCorp Vault credentials and test API endpoints for login, token lookup, and secret retrieval",
 };
 

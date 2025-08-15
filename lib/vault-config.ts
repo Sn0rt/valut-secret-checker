@@ -40,3 +40,17 @@ export function getVaultEndpoints(): string[] {
     return defaultEndpoints;
   }
 }
+
+export function getAppTitle(): string {
+  const defaultTitle = "HashiCorp Vault Credential Validator";
+
+  if (typeof window !== 'undefined') {
+    // Client-side: use the environment variable directly
+    const appTitle = process.env.NEXT_PUBLIC_APP_TITLE;
+    return appTitle && appTitle.trim() ? appTitle.trim() : defaultTitle;
+  }
+
+  // Server-side: use the same environment variable
+  const appTitle = process.env.NEXT_PUBLIC_APP_TITLE;
+  return appTitle && appTitle.trim() ? appTitle.trim() : defaultTitle;
+}
