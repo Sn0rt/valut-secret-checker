@@ -12,6 +12,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Combobox } from '@/components/ui/combobox';
 import { Info } from 'lucide-react';
+import { getVaultEndpoints } from '@/lib/vault-config';
 
 interface VaultCredentials {
   endpoint: string;
@@ -52,20 +53,25 @@ function useLocalStorage(key: string, initialValue: string) {
 }
 
 export default function Home() {
-  const [availableEndpoints, setAvailableEndpoints] = useState<string[]>([
-    "http://localhost:8200"
-  ]);
+  // Get the app title from environment variable or use default
+  const appTitle = process.env.NEXT_PUBLIC_APP_TITLE || "HashiCorp Vault Credential Validator";
+
+  // Get endpoints from environment variable
+  const vaultEndpoints = getVaultEndpoints();
+  const defaultEndpoint = vaultEndpoints[0];
+
+  const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
   const [endpoint, setEndpoint] = useState<string>('');
 
   // Use localStorage for non-sensitive fields
-  const [storedEndpoint, setStoredEndpoint] = useLocalStorage('vault-endpoint', 'http://localhost:8200');
+  const [storedEndpoint, setStoredEndpoint] = useLocalStorage('vault-endpoint', defaultEndpoint);
   const [storedAccessId, setStoredAccessId] = useLocalStorage('vault-accessId', '');
   const [storedSecretPath, setStoredSecretPath] = useLocalStorage('vault-secretPath', '');
   const [storedKeyName, setStoredKeyName] = useLocalStorage('vault-keyName', '');
   const [storedAuthMethod, setStoredAuthMethod] = useLocalStorage('vault-authMethod', 'approle');
 
   const [credentials, setCredentials] = useState<VaultCredentials>({
-    endpoint: storedEndpoint,
+    endpoint: storedEndpoint || defaultEndpoint,
     accessId: storedAccessId,
     accessKey: '', // Never store passwords/secrets for security
     secretPath: storedSecretPath,
@@ -75,8 +81,8 @@ export default function Home() {
 
   // Initialize endpoint state
   useEffect(() => {
-    setEndpoint(storedEndpoint);
-  }, [storedEndpoint]);
+    setEndpoint(storedEndpoint || defaultEndpoint);
+  }, [storedEndpoint, defaultEndpoint]);
 
   const [loading, setLoading] = useState<{
     login?: boolean;
@@ -302,7 +308,7 @@ export default function Home() {
           <Card className="w-full max-w-5xl shadow-xl border-0 bg-white/80 backdrop-blur-sm">
             <CardHeader className="text-left pb-8">
               <CardTitle className="text-4xl font-bold bg-gradient-to-r from-slate-800 to-slate-600 bg-clip-text text-transparent">
-                HashiCorp Vault Credential Validator
+                {appTitle}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-8">

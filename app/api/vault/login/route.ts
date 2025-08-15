@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
+import { axiosInstance } from '@/lib/axios';
 
 export async function POST(request: NextRequest) {
   try {
@@ -32,7 +32,7 @@ export async function POST(request: NextRequest) {
       };
     }
 
-    const response = await axios.post(loginUrl, loginPayload, {
+    const response = await axiosInstance.post(loginUrl, loginPayload, {
       timeout: 10000,
       headers: {
         'Content-Type': 'application/json'

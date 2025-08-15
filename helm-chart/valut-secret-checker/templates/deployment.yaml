@@ -55,6 +55,20 @@ spec:
             - name: {{ $key }}
               value: {{ $value | quote }}
             {{- end }}
+            {{- if .Values.tls.ca.enabled }}
+            - name: NODE_EXTRA_CA_CERTS
+              value: "{{ .Values.tls.ca.mountPath }}/{{ .Values.tls.ca.fileName }}"
+            {{- end }}
+          {{- else if .Values.tls.ca.enabled }}
+          env:
+            - name: NODE_EXTRA_CA_CERTS
+              value: "{{ .Values.tls.ca.mountPath }}/{{ .Values.tls.ca.fileName }}"
+          {{- end }}
+          {{- if .Values.tls.ca.enabled }}
+          volumeMounts:
+            - name: ca-certificates
+              mountPath: {{ .Values.tls.ca.mountPath }}
+              readOnly: true
           {{- end }}
           {{- with .Values.resources }}
           resources:
@@ -71,4 +85,13 @@ spec:
       {{- with .Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if .Values.tls.ca.enabled }}
+      volumes:
+        - name: ca-certificates
+          secret:
+            secretName: {{ .Values.tls.ca.secretName }}
+            items:
+              - key: {{ .Values.tls.ca.secretKey }}
+                path: {{ .Values.tls.ca.fileName }}
       {{- end }}

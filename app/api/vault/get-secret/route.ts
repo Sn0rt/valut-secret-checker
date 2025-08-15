@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
+import { axiosInstance } from '@/lib/axios';
 
 export async function POST(request: NextRequest) {
   try {
@@ -18,7 +18,7 @@ export async function POST(request: NextRequest) {
     const cleanSecretPath = secretPath.startsWith('/') ? secretPath.substring(1) : secretPath;
     const secretUrl = `${vaultUrl}/v1/secret/data/${cleanSecretPath}`;
 
-    const response = await axios.get(secretUrl, {
+    const response = await axiosInstance.get(secretUrl, {
       timeout: 10000,
       headers: {
         'X-Vault-Token': token,

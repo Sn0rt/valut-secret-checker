@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import axios from 'axios';
+import { axiosInstance } from '@/lib/axios';
 
 export async function POST(request: NextRequest) {
   try {
@@ -16,7 +16,7 @@ export async function POST(request: NextRequest) {
     const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
     const lookupUrl = `${vaultUrl}/v1/auth/token/lookup-self`;
 
-    const response = await axios.get(lookupUrl, {
+    const response = await axiosInstance.get(lookupUrl, {
       timeout: 10000,
       headers: {
         'X-Vault-Token': token,

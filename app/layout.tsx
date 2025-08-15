@@ -16,7 +16,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "HashiCorp Vault Credential Validator",
+  title: process.env.NEXT_PUBLIC_APP_TITLE || "HashiCorp Vault Credential Validator",
   description: "Validate HashiCorp Vault credentials and test API endpoints for login, token lookup, and secret retrieval",
 };
 
