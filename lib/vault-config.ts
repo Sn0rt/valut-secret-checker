@@ -1,3 +1,14 @@
+export interface AppConfig {
+  title: string;
+  endpoints: string[];
+}
+
+export interface ConfigResponse {
+  success: boolean;
+  config?: AppConfig;
+  error?: string;
+}
+
 export function getVaultEndpoints(): string[] {
   const defaultEndpoints = ["http://localhost:8200"];
 

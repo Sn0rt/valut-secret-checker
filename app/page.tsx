@@ -5,7 +5,7 @@ import axios from 'axios';
 import { toast } from 'sonner';
 import JsonView from '@uiw/react-json-view';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { getVaultEndpoints, getAppTitle } from '@/lib/vault-config';
+import { getVaultEndpoints, getAppTitle, type ConfigResponse } from '@/lib/vault-config';
 import { EndpointList } from '@/components/EndpointList';
 import { AuthenticationMethod } from '@/components/AuthenticationMethod';
 import { PermissionValidation } from '@/components/PermissionValidation';
@@ -51,8 +51,9 @@ function useLocalStorage(key: string, initialValue: string) {
 }
 
 export default function Home() {
-  // Get the app title from environment variable or use default
-  const appTitle = getAppTitle();
+  // Get default title (will be overridden by config API)
+  const defaultAppTitle = getAppTitle();
+  const [appTitle, setAppTitle] = useState<string>(defaultAppTitle);
 
   // Get endpoints from environment variable
   const vaultEndpoints = getVaultEndpoints();
@@ -93,19 +94,20 @@ export default function Home() {
 
   const [token, setToken] = useState<string>('');
 
-  // Load available endpoints from server
+  // Load application config (title and endpoints) from server
   useEffect(() => {
-    const loadEndpoints = async () => {
+    const loadConfig = async () => {
       try {
-        const response = await axios.get('/api/vault/endpoints');
-        if (response.data.success) {
-          setAvailableEndpoints(response.data.endpoints);
+        const response = await axios.get<ConfigResponse>('/api/vault/config');
+        if (response.data.success && response.data.config) {
+          setAppTitle(response.data.config.title);
+          setAvailableEndpoints(response.data.config.endpoints);
         }
       } catch (error) {
-        console.warn('Failed to load endpoints from server, using defaults:', error);
+        console.warn('Failed to load config from server, using defaults:', error);
       }
     };
-    loadEndpoints();
+    loadConfig();
   }, []);
 
   // Sync credentials with localStorage values when they change
