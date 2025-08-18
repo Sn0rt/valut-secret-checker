@@ -87,7 +87,7 @@ export default function Home() {
   const [loading, setLoading] = useState<{
     login?: boolean;
     lookup?: boolean;
-    getSecret?: boolean;
+    validateAccess?: boolean;
   }>({});
 
   const [token, setToken] = useState<string>('');
@@ -248,46 +248,34 @@ export default function Home() {
     }
   };
 
-  const testGetSecret = async () => {
+  const testValidateAccess = async () => {
     if (!credentials.endpoint || !token || !credentials.secretPath) {
       toast.error('Please login first and fill in secret path');
       return;
     }
 
-    setLoading(prev => ({ ...prev, getSecret: true }));
+    setLoading(prev => ({ ...prev, validateAccess: true }));
     try {
-      const response = await axios.post('/api/vault/get-secret', {
+      const response = await axios.post('/api/vault/validate-access', {
         endpoint: credentials.endpoint,
         token: token,
-        secretPath: credentials.secretPath,
-        keyName: credentials.keyName
+        secretPath: credentials.secretPath
       });
 
       const result = response.data;
       if (result.success) {
-        // Format the secret data for better display in toast
-        let secretData;
-        if (result.data.requestedSingleKey && result.data.keyName) {
-          // Single key result
-          secretData = {
-            [result.data.keyName]: result.data.keyValue,
-            keyExists: result.data.keyExists
-          };
-        } else if (result.data.allSecrets) {
-          // All keys result
-          secretData = {
-            totalKeys: result.data.totalKeys,
-            secrets: result.data.allSecrets,
-            metadata: result.data.metadata
-          };
-        } else {
-          // Fallback to show all data
-          secretData = result.data;
-        }
+        const permissionData = {
+          path: result.data.secretPath,
+          resolvedPath: result.data.resolvedPath,
+          capabilities: result.data.capabilities,
+          permissions: result.data.permissions,
+          summary: result.data.summary,
+          hasAccess: result.data.hasAccess
+        };
 
-        showJsonToast('Secret retrieved successfully!', secretData);
+        showJsonToast('Permission validation successful!', permissionData);
       } else {
-        toast.error('Failed to get secret: ' + (result.error || 'Unknown error'));
+        toast.error('Permission validation failed: ' + (result.error || 'Unknown error'));
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -295,9 +283,9 @@ export default function Home() {
         ? error as { response: { data: { error?: string } } }
         : null;
 
-      toast.error('Failed to get secret: ' + (axiosError?.response?.data?.error || errorMessage));
+      toast.error('Permission validation failed: ' + (axiosError?.response?.data?.error || errorMessage));
     } finally {
-      setLoading(prev => ({ ...prev, getSecret: false }));
+      setLoading(prev => ({ ...prev, validateAccess: false }));
     }
   };
 
@@ -418,14 +406,14 @@ export default function Home() {
                 </CardContent>
               </Card>
 
-              {/* Step 3: Secret Configuration */}
+              {/* Step 3: Permission Validation */}
               <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
                 <CardHeader className="pb-4">
                   <CardTitle className="text-xl font-semibold text-slate-700 flex items-center gap-2">
                     <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
                       <span className="text-sm font-bold text-purple-600">3</span>
                     </div>
-                    Secret Configuration
+                    Permission Validation
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -462,14 +450,14 @@ export default function Home() {
                             <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
                           </TooltipTrigger>
                           <TooltipContent side="top" className="max-w-xs">
-                            <p>If empty, returns all keys and values. If specified, returns only that key&apos;s value.</p>
+                            <p>Not used for permission validation. Leave empty for path-level access check.</p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
                       <Input
                         id="key-name"
                         type="text"
-                        placeholder="Leave empty to get all keys, or specify key name"
+                        placeholder="Not used for permission validation"
                         value={credentials.keyName}
                         onChange={(e) => handleInputChange('keyName', e.target.value)}
                       />
@@ -477,12 +465,12 @@ export default function Home() {
 
                     <div className="flex flex-col justify-end h-full">
                       <Button
-                        onClick={testGetSecret}
-                        disabled={loading.getSecret || !token}
+                        onClick={testValidateAccess}
+                        disabled={loading.validateAccess || !token}
                         className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6"
                       >
-                        {loading.getSecret && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
-                        Get Secret Value
+                        {loading.validateAccess && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
+                        Validate Access
                       </Button>
                     </div>
                   </div>
