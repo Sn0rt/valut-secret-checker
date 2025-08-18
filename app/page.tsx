@@ -23,6 +23,20 @@ interface VaultCredentials {
   authMethod: 'approle' | 'userpass';
 }
 
+// Function to mask role ID - show only first and last parts separated by dashes
+function maskRoleId(roleId: string): string {
+  if (!roleId || roleId.length === 0) return roleId;
+  
+  const parts = roleId.split('-');
+  if (parts.length <= 2) return roleId; // If only 1-2 parts, don't mask
+  
+  const firstPart = parts[0];
+  const lastPart = parts[parts.length - 1];
+  const maskedMiddle = '***';
+  
+  return `${firstPart}-${maskedMiddle}-${lastPart}`;
+}
+
 // Custom hook for localStorage persistence
 function useLocalStorage(key: string, initialValue: string) {
   const [storedValue, setStoredValue] = useState<string>(() => {
@@ -362,7 +376,7 @@ export default function Home() {
                         id="access-id"
                         type="text"
                         placeholder={credentials.authMethod === 'approle' ? 'your-role-id' : 'your-username'}
-                        value={credentials.accessId}
+                        value={credentials.authMethod === 'approle' && credentials.accessId ? maskRoleId(credentials.accessId) : credentials.accessId}
                         onChange={(e) => handleInputChange('accessId', e.target.value)}
                       />
                     </div>
