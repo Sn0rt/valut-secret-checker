@@ -1,17 +1,19 @@
 {{- if .Values.rbac.create }}
+{{- range .Values.rbac.allowedNamespaces }}
+---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
-  name: {{ include "valut-secret-checker.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "valut-secret-checker.fullname" $ }}-{{ . }}
+  namespace: {{ . }}
   labels:
-    {{- include "valut-secret-checker.labels" . | nindent 4 }}
+    {{- include "valut-secret-checker.labels" $ | nindent 4 }}
 rules:
 - apiGroups: [""]
   resources: ["secrets"]
   verbs: ["get", "list"]
-{{- if .Values.rbac.rules }}
-{{- with .Values.rbac.rules }}
+{{- if $.Values.rbac.rules }}
+{{- with $.Values.rbac.rules }}
 {{- toYaml . | nindent 0 }}
 {{- end }}
 {{- end }}
@@ -19,16 +21,17 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
-  name: {{ include "valut-secret-checker.fullname" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "valut-secret-checker.fullname" $ }}-{{ . }}
+  namespace: {{ . }}
   labels:
-    {{- include "valut-secret-checker.labels" . | nindent 4 }}
+    {{- include "valut-secret-checker.labels" $ | nindent 4 }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
-  name: {{ include "valut-secret-checker.fullname" . }}
+  name: {{ include "valut-secret-checker.fullname" $ }}-{{ . }}
 subjects:
 - kind: ServiceAccount
-  name: {{ include "valut-secret-checker.serviceAccountName" . }}
-  namespace: {{ .Release.Namespace }}
+  name: {{ include "valut-secret-checker.serviceAccountName" $ }}
+  namespace: {{ $.Release.Namespace }}
+{{- end }}
 {{- end }}

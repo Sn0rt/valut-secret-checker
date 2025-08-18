@@ -29,6 +29,12 @@ serviceAccount:
 rbac:
   # Specifies whether RBAC resources should be created
   create: true
+  # List of namespaces that the application is allowed to access for reading secrets
+  # Only these explicitly listed namespaces will have Role and RoleBinding created
+  # No wildcards allowed - each namespace must be explicitly specified
+  allowedNamespaces:
+    - "default"
+    - "vault-system"
   # Additional rules to add to the ClusterRole
   rules: []
   # Example additional rules:
@@ -38,11 +44,13 @@ rbac:
   #   verbs: ["get", "list"]
 
 # Pod Security Context
-podSecurityContext: {}
+podSecurityContext:
+  {}
   # fsGroup: 2000
 
 # Security Context
-securityContext: {}
+securityContext:
+  {}
   # capabilities:
   #   drop:
   #   - ALL
