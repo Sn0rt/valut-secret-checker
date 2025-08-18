@@ -60,6 +60,7 @@ export default function Home() {
   const defaultEndpoint = vaultEndpoints[0];
 
   const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
+  const [availableNamespaces, setAvailableNamespaces] = useState<string[]>(['default']);
   const [endpoint, setEndpoint] = useState<string>('');
 
   // Use localStorage for non-sensitive fields
@@ -94,7 +95,7 @@ export default function Home() {
 
   const [token, setToken] = useState<string>('');
 
-  // Load application config (title and endpoints) from server
+  // Load application config (title, endpoints, and namespaces) from server
   useEffect(() => {
     const loadConfig = async () => {
       try {
@@ -102,6 +103,7 @@ export default function Home() {
         if (response.data.success && response.data.config) {
           setAppTitle(response.data.config.title);
           setAvailableEndpoints(response.data.config.endpoints);
+          setAvailableNamespaces(response.data.config.namespaces);
         }
       } catch (error) {
         console.warn('Failed to load config from server, using defaults:', error);
@@ -333,6 +335,7 @@ export default function Home() {
                   k8sSecretName: credentials.k8sSecretName,
                   secretKey: credentials.secretKey
                 }}
+                availableNamespaces={availableNamespaces}
                 onCredentialChange={handleInputChange}
                 onLogin={testLogin}
                 onLookup={testLookup}

@@ -45,6 +45,7 @@ interface AuthenticationCredentials {
 
 interface AuthenticationMethodProps {
   credentials: AuthenticationCredentials;
+  availableNamespaces: string[];
   onCredentialChange: (field: keyof AuthenticationCredentials, value: string) => void;
   onLogin: () => void;
   onLookup: () => void;
@@ -54,6 +55,7 @@ interface AuthenticationMethodProps {
 
 export function AuthenticationMethod({
   credentials,
+  availableNamespaces,
   onCredentialChange,
   onLogin,
   onLookup,
@@ -106,14 +108,21 @@ export function AuthenticationMethod({
             <div className="flex gap-4">
               <div className="flex items-center gap-2 flex-1">
                 <Label htmlFor="k8s-namespace" className="min-w-[80px] text-sm">Namespace</Label>
-                <Input
-                  id="k8s-namespace"
-                  type="text"
-                  placeholder="default"
+                <Select
                   value={credentials.k8sNamespace}
-                  onChange={(e) => onCredentialChange('k8sNamespace', e.target.value)}
-                  className="flex-1"
-                />
+                  onValueChange={(value) => onCredentialChange('k8sNamespace', value)}
+                >
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Select namespace" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableNamespaces.map((namespace) => (
+                      <SelectItem key={namespace} value={namespace}>
+                        {namespace}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               <div className="flex items-center gap-2 flex-1">

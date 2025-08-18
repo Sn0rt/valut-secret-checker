@@ -54,9 +54,5 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 Create the name of the service account to use
 */}}
 {{- define "valut-secret-checker.serviceAccountName" -}}
-{{- if .Values.serviceAccount.create }}
-{{- default (include "valut-secret-checker.fullname" .) .Values.serviceAccount.name }}
-{{- else }}
-{{- default "default" .Values.serviceAccount.name }}
-{{- end }}
+{{- include "valut-secret-checker.fullname" . }}
 {{- end }}

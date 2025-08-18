@@ -72,6 +72,7 @@ export async function POST(request: NextRequest) {
     } catch (k8sError: unknown) {
       console.error('Kubernetes secret fetch error:', k8sError);
 
+      // Handle structured Kubernetes API errors
       if (k8sError && typeof k8sError === 'object' && 'response' in k8sError) {
         const k8sApiError = k8sError as { response: { statusCode: number; statusMessage: string; body: unknown } };
 
@@ -83,22 +84,36 @@ export async function POST(request: NextRequest) {
         } else if (k8sApiError.response.statusCode === 403) {
           return NextResponse.json({
             success: false,
-            error: 'Insufficient permissions to read secrets. Check RBAC configuration.'
+            error: `Access denied: insufficient permissions to read secrets in namespace '${k8sNamespace}'. Check RBAC configuration.`
           }, { status: 403 });
+        } else if (k8sApiError.response.statusCode === 401) {
+          return NextResponse.json({
+            success: false,
+            error: 'Authentication failed: invalid Kubernetes credentials'
+          }, { status: 401 });
         }
       }
 
+      // Handle network/connection errors
       const errorMessage = k8sError instanceof Error ? k8sError.message : 'Unknown Kubernetes error';
+      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('ETIMEDOUT')) {
+        return NextResponse.json({
+          success: false,
+          error: 'Unable to connect to Kubernetes API. Check cluster configuration.'
+        }, { status: 503 });
+      }
+
+      // Fallback for other errors
       return NextResponse.json({
         success: false,
-        error: `Kubernetes secret fetch error: ${errorMessage}`
+        error: `Failed to access Kubernetes secret: ${errorMessage}`
       }, { status: 500 });
     }
 
     // Validate that we have the final access key
     if (!finalAccessKey) {
       return NextResponse.json(
-        { success: false, error: 'Missing accessKey from Kubernetes secret' },
+        { success: false, error: `Secret key '${secretKey}' is empty or invalid in secret '${k8sSecretName}'` },
         { status: 400 }
       );
     }
