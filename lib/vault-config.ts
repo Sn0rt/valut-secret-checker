@@ -1,12 +1,36 @@
 export interface AppConfig {
   title: string;
   endpoints: string[];
+  namespaces: string[];
 }
 
 export interface ConfigResponse {
   success: boolean;
   config?: AppConfig;
   error?: string;
+}
+
+export function getK8sNamespaces(): string[] {
+  const defaultNamespaces = ["default"];
+  
+  // Support both server and client side environment variables
+  const namespaceList = process.env.K8S_NAMESPACE_LIST || process.env.NEXT_PUBLIC_K8S_NAMESPACE_LIST;
+  
+  if (!namespaceList) {
+    return defaultNamespaces;
+  }
+  
+  try {
+    const namespaces = namespaceList
+      .split(',')
+      .map(ns => ns.trim())
+      .filter(ns => ns && ns.length > 0);
+    
+    return namespaces.length > 0 ? namespaces : defaultNamespaces;
+  } catch (error) {
+    console.warn('Error parsing K8S_NAMESPACE_LIST:', error);
+    return defaultNamespaces;
+  }
 }
 
 export function getVaultEndpoints(): string[] {

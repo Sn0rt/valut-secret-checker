@@ -25,24 +25,6 @@ serviceAccount:
   # If not set and create is true, a name is generated using the fullname template
   name: ""
 
-# RBAC configuration
-rbac:
-  # Specifies whether RBAC resources should be created
-  create: true
-  # List of namespaces that the application is allowed to access for reading secrets
-  # Only these explicitly listed namespaces will have Role and RoleBinding created
-  # No wildcards allowed - each namespace must be explicitly specified
-  allowedNamespaces:
-    - "default"
-    - "vault-system"
-  # Additional rules to add to the ClusterRole
-  rules: []
-  # Example additional rules:
-  # rules:
-  # - apiGroups: [""]
-  #   resources: ["configmaps"]
-  #   verbs: ["get", "list"]
-
 # Pod Security Context
 podSecurityContext:
   {}
@@ -98,6 +80,9 @@ env:
   NEXT_PUBLIC_VAULT_ENDPOINTS: "https://vault.prod.com,https://vault.staging.com"
   # Custom application title (optional)
   NEXT_PUBLIC_APP_TITLE: ""
+  # Kubernetes namespaces allowed for secret access (comma-separated list)
+  # This controls both UI dropdown options and RBAC permissions
+  K8S_NAMESPACE_LIST: "default,vault-system"
   # Add more environment variables as needed
   # NODE_ENV: production
 
