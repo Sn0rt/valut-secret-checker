@@ -13,6 +13,43 @@ imagePullSecrets: []
 nameOverride: ""
 fullnameOverride: ""
 
+# ServiceAccount configuration
+serviceAccount:
+  # Specifies whether a service account should be created
+  create: true
+  # Automatically mount a ServiceAccount's API credentials?
+  automount: true
+  # Annotations to add to the service account
+  annotations: {}
+  # The name of the service account to use.
+  # If not set and create is true, a name is generated using the fullname template
+  name: ""
+
+# RBAC configuration
+rbac:
+  # Specifies whether RBAC resources should be created
+  create: true
+  # Additional rules to add to the ClusterRole
+  rules: []
+  # Example additional rules:
+  # rules:
+  # - apiGroups: [""]
+  #   resources: ["configmaps"]
+  #   verbs: ["get", "list"]
+
+# Pod Security Context
+podSecurityContext: {}
+  # fsGroup: 2000
+
+# Security Context
+securityContext: {}
+  # capabilities:
+  #   drop:
+  #   - ALL
+  # readOnlyRootFilesystem: true
+  # runAsNonRoot: true
+  # runAsUser: 1000
+
 podAnnotations: {}
 podLabels: {}
 

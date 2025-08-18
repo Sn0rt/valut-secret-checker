@@ -4,53 +4,37 @@ import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import JsonView from '@uiw/react-json-view';
-import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Combobox } from '@/components/ui/combobox';
-import { Info } from 'lucide-react';
 import { getVaultEndpoints, getAppTitle } from '@/lib/vault-config';
+import { EndpointList } from '@/components/EndpointList';
+import { AuthenticationMethod } from '@/components/AuthenticationMethod';
+import { PermissionValidation } from '@/components/PermissionValidation';
 
 interface VaultCredentials {
   endpoint: string;
   accessId: string;
   accessKey: string;
   secretPath: string;
-  keyName: string; // Optional - if empty, returns all keys
-  authMethod: 'approle' | 'userpass';
-}
-
-// Function to mask role ID - show only first and last parts separated by dashes
-function maskRoleId(roleId: string): string {
-  if (!roleId || roleId.length === 0) return roleId;
-  
-  const parts = roleId.split('-');
-  if (parts.length <= 2) return roleId; // If only 1-2 parts, don't mask
-  
-  const firstPart = parts[0];
-  const lastPart = parts[parts.length - 1];
-  const maskedMiddle = '***';
-  
-  return `${firstPart}-${maskedMiddle}-${lastPart}`;
+  authMethod: 'approle';
+  k8sNamespace: string; // Kubernetes namespace
+  k8sSecretName: string; // Kubernetes secret name
+  secretKey: string; // Key name within the Kubernetes secret
 }
 
 // Custom hook for localStorage persistence
 function useLocalStorage(key: string, initialValue: string) {
-  const [storedValue, setStoredValue] = useState<string>(() => {
-    if (typeof window === 'undefined') {
-      return initialValue;
-    }
+  const [storedValue, setStoredValue] = useState<string>(initialValue);
+
+  useEffect(() => {
     try {
       const item = window.localStorage.getItem(key);
-      return item ? item : initialValue;
+      if (item) {
+        setStoredValue(item);
+      }
     } catch (error) {
       console.warn(`Error reading localStorage key "${key}":`, error);
-      return initialValue;
     }
-  });
+  }, [key]);
 
   const setValue = (value: string) => {
     try {
@@ -81,16 +65,19 @@ export default function Home() {
   const [storedEndpoint, setStoredEndpoint] = useLocalStorage('vault-endpoint', defaultEndpoint);
   const [storedAccessId, setStoredAccessId] = useLocalStorage('vault-accessId', '');
   const [storedSecretPath, setStoredSecretPath] = useLocalStorage('vault-secretPath', '');
-  const [storedKeyName, setStoredKeyName] = useLocalStorage('vault-keyName', '');
-  const [storedAuthMethod, setStoredAuthMethod] = useLocalStorage('vault-authMethod', 'approle');
+  const [storedK8sNamespace, setStoredK8sNamespace] = useLocalStorage('vault-k8sNamespace', '');
+  const [storedK8sSecretName, setStoredK8sSecretName] = useLocalStorage('vault-k8sSecretName', '');
+  const [storedSecretKey, setStoredSecretKey] = useLocalStorage('vault-secretKey', 'secret-id');
 
   const [credentials, setCredentials] = useState<VaultCredentials>({
     endpoint: storedEndpoint || defaultEndpoint,
     accessId: storedAccessId,
     accessKey: '', // Never store passwords/secrets for security
     secretPath: storedSecretPath,
-    keyName: storedKeyName,
-    authMethod: storedAuthMethod as 'approle' | 'userpass'
+    authMethod: 'approle',
+    k8sNamespace: storedK8sNamespace,
+    k8sSecretName: storedK8sSecretName,
+    secretKey: storedSecretKey
   });
 
   // Initialize endpoint state
@@ -128,10 +115,12 @@ export default function Home() {
       endpoint: endpoint,
       accessId: storedAccessId,
       secretPath: storedSecretPath,
-      keyName: storedKeyName,
-      authMethod: storedAuthMethod as 'approle' | 'userpass'
+      authMethod: 'approle',
+      k8sNamespace: storedK8sNamespace,
+      k8sSecretName: storedK8sSecretName,
+      secretKey: storedSecretKey
     }));
-  }, [endpoint, storedAccessId, storedSecretPath, storedKeyName, storedAuthMethod]);
+  }, [endpoint, storedAccessId, storedSecretPath, storedK8sNamespace, storedK8sSecretName, storedSecretKey]);
 
   const handleEndpointChange = (value: string) => {
     setEndpoint(value);
@@ -186,29 +175,40 @@ export default function Home() {
       case 'secretPath':
         setStoredSecretPath(value);
         break;
-      case 'keyName':
-        setStoredKeyName(value);
+      case 'k8sNamespace':
+        setStoredK8sNamespace(value);
         break;
-      case 'authMethod':
-        setStoredAuthMethod(value);
+      case 'k8sSecretName':
+        setStoredK8sSecretName(value);
+        break;
+      case 'secretKey':
+        setStoredSecretKey(value);
         break;
       // accessKey is intentionally not persisted for security reasons
     }
   };
 
   const testLogin = async () => {
-    if (!credentials.endpoint || !credentials.accessId || !credentials.accessKey) {
-      toast.error('Please fill in endpoint, access ID, and access key');
+    if (!endpoint || !credentials.accessId) {
+      toast.error('Please fill in endpoint and access ID');
+      return;
+    }
+
+    // For AppRole, validate K8s secret fields
+    if (!credentials.k8sNamespace || !credentials.k8sSecretName || !credentials.secretKey) {
+      toast.error('Please fill in all Kubernetes secret reference fields');
       return;
     }
 
     setLoading(prev => ({ ...prev, login: true }));
     try {
       const response = await axios.post('/api/vault/login', {
-        endpoint: credentials.endpoint,
+        endpoint: endpoint,
         accessId: credentials.accessId,
-        accessKey: credentials.accessKey,
-        authMethod: credentials.authMethod
+        authMethod: credentials.authMethod,
+        k8sNamespace: credentials.k8sNamespace,
+        k8sSecretName: credentials.k8sSecretName,
+        secretKey: credentials.secretKey
       });
 
       const result = response.data;
@@ -232,7 +232,7 @@ export default function Home() {
   };
 
   const testLookup = async () => {
-    if (!credentials.endpoint || !token) {
+    if (!endpoint || !token) {
       toast.error('Please login first to get a token');
       return;
     }
@@ -240,7 +240,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, lookup: true }));
     try {
       const response = await axios.post('/api/vault/lookup', {
-        endpoint: credentials.endpoint,
+        endpoint: endpoint,
         token: token
       });
 
@@ -263,7 +263,7 @@ export default function Home() {
   };
 
   const testValidateAccess = async () => {
-    if (!credentials.endpoint || !token || !credentials.secretPath) {
+    if (!endpoint || !token || !credentials.secretPath) {
       toast.error('Please login first and fill in secret path');
       return;
     }
@@ -271,7 +271,7 @@ export default function Home() {
     setLoading(prev => ({ ...prev, validateAccess: true }));
     try {
       const response = await axios.post('/api/vault/validate-access', {
-        endpoint: credentials.endpoint,
+        endpoint: endpoint,
         token: token,
         secretPath: credentials.secretPath
       });
@@ -315,202 +315,38 @@ export default function Home() {
             </CardHeader>
             <CardContent className="space-y-8">
               {/* Step 1: Vault Endpoint */}
-              <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                      <span className="text-sm font-bold text-blue-600">1</span>
-                    </div>
-                    Endpoint Configuration
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    <Label htmlFor="endpoint-select">Vault Endpoint</Label>
-                    <Combobox
-                      options={availableEndpoints}
-                      value={endpoint}
-                      onValueChange={handleEndpointChange}
-                      placeholder="Select or enter vault endpoint..."
-                      emptyText="No endpoints found. Type to add custom endpoint."
-                      allowCustom={true}
-                      className="w-full"
-                    />
-                  </div>
-                </CardContent>
-              </Card>
+              <EndpointList
+                availableEndpoints={availableEndpoints}
+                currentEndpoint={endpoint}
+                onEndpointChange={handleEndpointChange}
+              />
 
               {/* Step 2: Authentication Method */}
-              <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
-                      <span className="text-sm font-bold text-green-600">2</span>
-                    </div>
-                    Authentication Method
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-                    <div className="space-y-2">
-                      <Label htmlFor="auth-type">Authentication Type</Label>
-                      <Select
-                        value={credentials.authMethod}
-                        onValueChange={(value) => handleInputChange('authMethod', value)}
-                      >
-                        <SelectTrigger id="auth-type">
-                          <SelectValue placeholder="Select authentication method" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="approle">AppRole</SelectItem>
-                          <SelectItem value="userpass">Username / Password</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="access-id">
-                        {credentials.authMethod === 'approle' ? 'Role ID' : 'Username'}
-                      </Label>
-                      <Input
-                        id="access-id"
-                        type="text"
-                        placeholder={credentials.authMethod === 'approle' ? 'your-role-id' : 'your-username'}
-                        value={credentials.authMethod === 'approle' && credentials.accessId ? maskRoleId(credentials.accessId) : credentials.accessId}
-                        onChange={(e) => handleInputChange('accessId', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <Label htmlFor="access-key">
-                        {credentials.authMethod === 'approle' ? 'Secret ID' : 'Password'}
-                      </Label>
-                      <Input
-                        id="access-key"
-                        type="password"
-                        placeholder={credentials.authMethod === 'approle' ? 'your-secret-id' : 'your-password'}
-                        value={credentials.accessKey}
-                        onChange={(e) => handleInputChange('accessKey', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex flex-col justify-end">
-                      <div className="flex gap-2">
-                        <Button
-                          onClick={testLogin}
-                          disabled={loading.login || !credentials.endpoint || !credentials.accessId || !credentials.accessKey}
-                          className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
-                        >
-                          {loading.login && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
-                          Login
-                        </Button>
-
-                        <Button
-                          onClick={testLookup}
-                          disabled={loading.lookup || !token}
-                          className="flex-1 bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
-                          variant="outline"
-                        >
-                          {loading.lookup && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
-                          Lookup
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <AuthenticationMethod
+                credentials={{
+                  authMethod: credentials.authMethod,
+                  accessId: credentials.accessId,
+                  accessKey: credentials.accessKey,
+                  k8sNamespace: credentials.k8sNamespace,
+                  k8sSecretName: credentials.k8sSecretName,
+                  secretKey: credentials.secretKey
+                }}
+                onCredentialChange={handleInputChange}
+                onLogin={testLogin}
+                onLookup={testLookup}
+                loading={loading}
+                token={token}
+              />
 
               {/* Step 3: Permission Validation */}
-              <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
-                <CardHeader className="pb-4">
-                  <CardTitle className="text-xl font-semibold text-slate-700 flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
-                      <span className="text-sm font-bold text-purple-600">3</span>
-                    </div>
-                    Permission Validation
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="secret-path">Secret Path</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <p>
-                              <strong>Absolute path:</strong> Start with &apos;/&apos; to use the full path (e.g., &apos;/v1/secret/data/myapp/config&apos;).<br />
-                              <strong>Relative path:</strong> Enter path after &apos;secret/&apos; (e.g., &apos;myapp/config&apos; becomes &apos;/v1/secret/data/myapp/config&apos;).
-                            </p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id="secret-path"
-                        type="text"
-                        placeholder="myapp/config or /v1/secret/data/myapp/config"
-                        value={credentials.secretPath}
-                        onChange={(e) => handleInputChange('secretPath', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <Label htmlFor="key-name">Key Name (Optional)</Label>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <Info className="h-4 w-4 text-muted-foreground hover:text-foreground cursor-help" />
-                          </TooltipTrigger>
-                          <TooltipContent side="top" className="max-w-xs">
-                            <p>Not used for permission validation. Leave empty for path-level access check.</p>
-                          </TooltipContent>
-                        </Tooltip>
-                      </div>
-                      <Input
-                        id="key-name"
-                        type="text"
-                        placeholder="Not used for permission validation"
-                        value={credentials.keyName}
-                        onChange={(e) => handleInputChange('keyName', e.target.value)}
-                      />
-                    </div>
-
-                    <div className="flex flex-col justify-end h-full">
-                      <Button
-                        onClick={testValidateAccess}
-                        disabled={loading.validateAccess || !token}
-                        className="w-full bg-blue-600 hover:bg-blue-700 text-white mt-6"
-                      >
-                        {loading.validateAccess && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full"></div>}
-                        Validate Access
-                      </Button>
-                    </div>
-                  </div>
-                  {credentials.secretPath && credentials.endpoint ? (
-                    <div className="mt-4 text-xs text-muted-foreground p-3 bg-blue-50 rounded-md border border-blue-200">
-                      <div className="font-medium text-blue-800 mb-1">Final URL Preview:</div>
-                      <div className="font-mono text-blue-700 break-all">
-                        {credentials.endpoint.endsWith('/') ? credentials.endpoint.slice(0, -1) : credentials.endpoint}
-                        {credentials.secretPath.startsWith('/')
-                          ? credentials.secretPath
-                          : `/v1/secret/data/${credentials.secretPath}`
-                        }
-                      </div>
-                    </div>
-                  ) : null}
-                </CardContent>
-              </Card>
-
-              {token && (
-                <Card className="border-green-200 bg-green-50">
-                  <CardContent className="pt-4">
-                    <div className="text-sm font-medium text-green-800">Current Token:</div>
-                    <div className="text-xs text-green-700 font-mono break-all mt-1">{token}</div>
-                  </CardContent>
-                </Card>
-              )}
+              <PermissionValidation
+                secretPath={credentials.secretPath}
+                endpoint={endpoint}
+                onSecretPathChange={(path) => handleInputChange('secretPath', path)}
+                onValidateAccess={testValidateAccess}
+                loading={loading}
+                disabled={!token}
+              />
             </CardContent>
           </Card>
         </div>
