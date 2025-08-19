@@ -282,16 +282,7 @@ export default function Home() {
 
       const result = response.data;
       if (result.success) {
-        const permissionData = {
-          path: result.data.secretPath,
-          resolvedPath: result.data.resolvedPath,
-          capabilities: result.data.capabilities,
-          permissions: result.data.permissions,
-          summary: result.data.summary,
-          hasAccess: result.data.hasAccess
-        };
-
-        showJsonToast('Permission validation successful!', permissionData);
+        showJsonToast('Permission validation successful!', result.data);
       } else {
         toast.error('Permission validation failed: ' + (result.error || 'Unknown error'));
       }
@@ -346,7 +337,6 @@ export default function Home() {
               {/* Step 3: Permission Validation */}
               <PermissionValidation
                 secretPath={credentials.secretPath}
-                endpoint={endpoint}
                 onSecretPathChange={(path) => handleInputChange('secretPath', path)}
                 onValidateAccess={testValidateAccess}
                 loading={loading}

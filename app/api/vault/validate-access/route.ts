@@ -1,12 +1,27 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { axiosInstance } from '@/lib/axios';
+import { serverDebug, serverError } from '@/lib/server-logger';
 
 export async function POST(request: NextRequest) {
+  const requestId = Math.random().toString(36).substring(7);
+  const startTime = Date.now();
+
+  serverDebug(`[VALIDATE-${requestId}] Request started at ${new Date().toISOString()}`);
+
   try {
     const body = await request.json();
     const { endpoint, token, secretPath } = body;
 
+    serverDebug(`[VALIDATE-${requestId}] Request parameters:`, {
+      endpoint,
+      hasToken: !!token,
+      tokenLength: token ? token.length : 0,
+      secretPath,
+      hasBody: !!body
+    });
+
     if (!endpoint || !token || !secretPath) {
+      serverDebug(`[VALIDATE-${requestId}] Validation failed: Missing required fields`);
       return NextResponse.json(
         { success: false, error: 'Missing required fields: endpoint, token, secretPath' },
         { status: 400 }
@@ -14,18 +29,15 @@ export async function POST(request: NextRequest) {
     }
 
     const vaultUrl = endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint;
-    
-    // Build the path for capabilities check
-    let pathForCheck: string;
-    if (secretPath.startsWith('/')) {
-      // Absolute path: use as-is but remove leading slash for capabilities API
-      pathForCheck = secretPath.substring(1);
-    } else {
-      // Relative path: use existing logic with secret/data/ prefix
-      pathForCheck = `secret/data/${secretPath}`;
-    }
+
+    // Build the path for capabilities check - use secretPath directly
+    const pathForCheck = secretPath.startsWith('/') ? secretPath.substring(1) : secretPath;
+    serverDebug(`[VALIDATE-${requestId}] Using path for capabilities check: ${secretPath} -> ${pathForCheck}`);
 
     const capabilitiesUrl = `${vaultUrl}/v1/sys/capabilities-self`;
+
+    serverDebug(`[VALIDATE-${requestId}] Making Vault capabilities request to: ${capabilitiesUrl}`);
+    serverDebug(`[VALIDATE-${requestId}] Request payload:`, { path: pathForCheck });
 
     const response = await axiosInstance.post(capabilitiesUrl, {
       path: pathForCheck
@@ -37,35 +49,29 @@ export async function POST(request: NextRequest) {
       }
     });
 
-    const capabilities = response.data.capabilities || [];
-    const hasReadPermission = capabilities.includes('read');
-    const hasListPermission = capabilities.includes('list');
-    const hasWritePermission = capabilities.includes('write');
-    const hasDeletePermission = capabilities.includes('delete');
+    serverDebug(`[VALIDATE-${requestId}] Vault capabilities request successful, response status: ${response.status}`);
+
+    const duration = Date.now() - startTime;
+    serverDebug(`[VALIDATE-${requestId}] Request completed successfully in ${duration}ms`);
 
     return NextResponse.json({
       success: true,
-      data: {
-        secretPath: secretPath,
-        resolvedPath: pathForCheck,
-        capabilities: capabilities,
-        permissions: {
-          read: hasReadPermission,
-          list: hasListPermission,
-          write: hasWritePermission,
-          delete: hasDeletePermission
-        },
-        hasAccess: hasReadPermission || hasListPermission,
-        summary: `Token has ${capabilities.length > 0 ? capabilities.join(', ') : 'no'} permissions on this path`
-      }
+      data: response.data
     });
 
   } catch (error: unknown) {
+    const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-    console.error('Vault permission validation error:', errorMessage);
-    
+    serverError(`[VALIDATE-${requestId}] Request failed after ${duration}ms:`, errorMessage);
+
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response: { status: number; statusText: string; data: unknown } };
+      serverDebug(`[VALIDATE-${requestId}] Axios error details:`, {
+        status: axiosError.response.status,
+        statusText: axiosError.response.statusText,
+        data: axiosError.response.data
+      });
+
       return NextResponse.json({
         success: false,
         error: `Permission validation failed: ${axiosError.response.status} ${axiosError.response.statusText}`,

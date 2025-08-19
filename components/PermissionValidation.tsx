@@ -9,7 +9,6 @@ import { Info } from 'lucide-react';
 
 interface PermissionValidationProps {
   secretPath: string;
-  endpoint: string;
   onSecretPathChange: (path: string) => void;
   onValidateAccess: () => void;
   loading: { validateAccess?: boolean };
@@ -18,7 +17,6 @@ interface PermissionValidationProps {
 
 export function PermissionValidation({
   secretPath,
-  endpoint,
   onSecretPathChange,
   onValidateAccess,
   loading,
@@ -45,8 +43,8 @@ export function PermissionValidation({
                 </TooltipTrigger>
                 <TooltipContent side="top" className="max-w-xs">
                   <p>
-                    <strong>Absolute path:</strong> Start with &apos;/&apos; to use the full path (e.g., &apos;/v1/secret/data/myapp/config&apos;).<br />
-                    <strong>Relative path:</strong> Enter path after &apos;secret/&apos; (e.g., &apos;myapp/config&apos; becomes &apos;/v1/secret/data/myapp/config&apos;).
+                    <strong>Secret Path:</strong> Enter the exact path to validate permissions for. The path will be passed directly to Vault&apos;s capabilities-self API.<br />
+                    <strong>Examples:</strong> &apos;secret/data/myapp/config&apos; or &apos;/v1/secret/data/myapp/config&apos;
                   </p>
                 </TooltipContent>
               </Tooltip>
@@ -54,27 +52,13 @@ export function PermissionValidation({
             <Input
               id="secret-path"
               type="text"
-              placeholder="myapp/config or /v1/secret/data/myapp/config"
+              placeholder="secret/data/myapp/config"
               value={secretPath}
               onChange={(e) => onSecretPathChange(e.target.value)}
               className="w-80"
             />
           </div>
 
-          {secretPath && endpoint && (
-            <div className="text-xs text-muted-foreground p-2 bg-blue-50 rounded-md border border-blue-200">
-              <div className="flex items-center justify-between">
-                <div className="font-medium text-blue-800">Final URL Preview:</div>
-                <div className="font-mono text-blue-700 break-all">
-                  {endpoint.endsWith('/') ? endpoint.slice(0, -1) : endpoint}
-                  {secretPath.startsWith('/')
-                    ? secretPath
-                    : `/v1/secret/data/${secretPath}`
-                  }
-                </div>
-              </div>
-            </div>
-          )}
 
           <div className="flex justify-end pt-2">
             <Button
