@@ -6,12 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
 
 interface AuthenticationCredentials {
   authMethod: 'approle';
   accessId: string;
-  accessKey: string;
   k8sNamespace: string;
   k8sSecretName: string;
   secretKey: string; // Key name within the Kubernetes secret
@@ -23,7 +22,8 @@ interface AuthenticationMethodProps {
   onCredentialChange: (field: keyof AuthenticationCredentials, value: string) => void;
   onLogin: () => void;
   onLookup: () => void;
-  loading: { login?: boolean; lookup?: boolean };
+  onLogout: () => void;
+  loading: { login?: boolean; lookup?: boolean; logout?: boolean };
   token: string;
 }
 
@@ -33,6 +33,7 @@ export function AuthenticationMethod({
   onCredentialChange,
   onLogin,
   onLookup,
+  onLogout,
   loading,
   token
 }: AuthenticationMethodProps) {
@@ -147,8 +148,24 @@ export function AuthenticationMethod({
             </div>
           </div>
 
-          {/* 按钮独立在右下角 */}
-          <div className="flex justify-end pt-4">
+          {/* 按钮和状态在同一水平线 */}
+          <div className="flex justify-between items-center pt-4">
+            {/* 左侧: Token状态 */}
+            <div className="flex items-center gap-2">
+              {token ? (
+                <>
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <span className="text-sm text-green-700">Token Active</span>
+                </>
+              ) : (
+                <>
+                  <XCircle className="h-4 w-4 text-red-500" />
+                  <span className="text-sm text-red-500">No Token</span>
+                </>
+              )}
+            </div>
+            
+            {/* 右侧: 按钮组 */}
             <div className="flex gap-2">
               <Button
                 onClick={onLogin}
@@ -173,18 +190,18 @@ export function AuthenticationMethod({
                 {loading.lookup && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
                 Lookup
               </Button>
+
+              <Button
+                onClick={onLogout}
+                disabled={loading.logout || !token}
+                className="bg-red-600 hover:bg-red-700 text-white"
+                variant="destructive"
+              >
+                {loading.logout && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
+                Logout
+              </Button>
             </div>
           </div>
-
-          {/* Current Token Display */}
-          {token && (
-            <div className="mt-6 p-4 border border-green-200 bg-green-50 rounded-lg">
-              <div className="text-sm font-medium text-green-800 mb-2">Current Token:</div>
-              <div className="text-xs text-green-700 font-mono break-all bg-white p-2 rounded border border-green-200">
-                {token}
-              </div>
-            </div>
-          )}
         </div>
       </CardContent>
     </Card>

@@ -13,7 +13,6 @@ import { PermissionValidation } from '@/components/PermissionValidation';
 interface VaultCredentials {
   endpoint: string;
   accessId: string;
-  accessKey: string;
   secretPath: string;
   authMethod: 'approle';
   k8sNamespace: string; // Kubernetes namespace
@@ -74,7 +73,6 @@ export default function Home() {
   const [credentials, setCredentials] = useState<VaultCredentials>({
     endpoint: storedEndpoint || defaultEndpoint,
     accessId: storedAccessId,
-    accessKey: '', // Never store passwords/secrets for security
     secretPath: storedSecretPath,
     authMethod: 'approle',
     k8sNamespace: storedK8sNamespace,
@@ -90,6 +88,7 @@ export default function Home() {
   const [loading, setLoading] = useState<{
     login?: boolean;
     lookup?: boolean;
+    logout?: boolean;
     validateAccess?: boolean;
   }>({});
 
@@ -99,7 +98,7 @@ export default function Home() {
   useEffect(() => {
     const loadConfig = async () => {
       try {
-        const response = await axios.get<ConfigResponse>('/api/vault/config');
+        const response = await axios.get<ConfigResponse>('/api/config');
         if (response.data.success && response.data.config) {
           setAppTitle(response.data.config.title);
           setAvailableEndpoints(response.data.config.endpoints);
@@ -188,7 +187,6 @@ export default function Home() {
       case 'secretKey':
         setStoredSecretKey(value);
         break;
-      // accessKey is intentionally not persisted for security reasons
     }
   };
 
@@ -206,7 +204,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, login: true }));
     try {
-      const response = await axios.post('/api/vault/login', {
+      const response = await axios.post('/api/vault/approle/login', {
         endpoint: endpoint,
         accessId: credentials.accessId,
         authMethod: credentials.authMethod,
@@ -266,6 +264,34 @@ export default function Home() {
     }
   };
 
+  const testLogout = async () => {
+    if (!endpoint || !token) {
+      toast.error('No token to revoke');
+      return;
+    }
+
+    setLoading(prev => ({ ...prev, logout: true }));
+    try {
+      const response = await axios.post('/api/vault/revoke-self', {
+        endpoint: endpoint,
+        token: token
+      });
+
+      // Vault revoke-self returns 204 No Content on success
+      setToken('');
+      toast.success('Logout successful! Token revoked.');
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const axiosError = error && typeof error === 'object' && 'response' in error
+        ? error as { response: { data: { error?: string } } }
+        : null;
+
+      toast.error('Logout failed: ' + (axiosError?.response?.data?.error || errorMessage));
+    } finally {
+      setLoading(prev => ({ ...prev, logout: false }));
+    }
+  };
+
   const testValidateAccess = async () => {
     if (!endpoint || !token || !credentials.secretPath) {
       toast.error('Please login first and fill in secret path');
@@ -274,7 +300,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, validateAccess: true }));
     try {
-      const response = await axios.post('/api/vault/validate-access', {
+      const response = await axios.post('/api/vault/capabilities-self', {
         endpoint: endpoint,
         token: token,
         secretPath: credentials.secretPath
@@ -321,7 +347,6 @@ export default function Home() {
                 credentials={{
                   authMethod: credentials.authMethod,
                   accessId: credentials.accessId,
-                  accessKey: credentials.accessKey,
                   k8sNamespace: credentials.k8sNamespace,
                   k8sSecretName: credentials.k8sSecretName,
                   secretKey: credentials.secretKey
@@ -330,6 +355,7 @@ export default function Home() {
                 onCredentialChange={handleInputChange}
                 onLogin={testLogin}
                 onLookup={testLookup}
+                onLogout={testLogout}
                 loading={loading}
                 token={token}
               />
