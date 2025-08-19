@@ -1,38 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-
-// Function to mask role ID - preserve UUID format, mask middle segments
-function maskRoleId(roleId: string): string {
-  if (!roleId || roleId.length === 0) return roleId;
-
-  // Check if it's a UUID format (contains dashes)
-  if (roleId.includes('-')) {
-    const parts = roleId.split('-');
-    if (parts.length >= 3) {
-      // Keep first and last part, mask middle parts
-      const firstPart = parts[0];
-      const lastPart = parts[parts.length - 1];
-      const middleParts = parts.slice(1, -1).map(part => '*'.repeat(part.length));
-
-      return [firstPart, ...middleParts, lastPart].join('-');
-    }
-  }
-
-  // Fallback for non-UUID strings: keep first 2 and last 2 characters
-  if (roleId.length <= 4) return roleId;
-
-  const firstPart = roleId.substring(0, 2);
-  const lastPart = roleId.substring(roleId.length - 2);
-  const middleLength = roleId.length - 4;
-  const maskedMiddle = '*'.repeat(middleLength);
-
-  return `${firstPart}${maskedMiddle}${lastPart}`;
-}
+import { Eye, EyeOff } from 'lucide-react';
 
 interface AuthenticationCredentials {
   authMethod: 'approle';
@@ -62,6 +36,7 @@ export function AuthenticationMethod({
   loading,
   token
 }: AuthenticationMethodProps) {
+  const [showRoleId, setShowRoleId] = useState(false);
   return (
     <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="pb-4">
@@ -93,14 +68,35 @@ export function AuthenticationMethod({
           {/* 第二行: Role ID - 标签左侧，输入框最右侧 */}
           <div className="flex items-center justify-between">
             <Label htmlFor="access-id" className="min-w-[140px]">Role ID</Label>
-            <Input
-              id="access-id"
-              type="text"
-              placeholder="your-role-id"
-              value={credentials.accessId ? maskRoleId(credentials.accessId) : ''}
-              onChange={(e) => onCredentialChange('accessId', e.target.value)}
-              className="w-80"
-            />
+            <div className="relative">
+              <Input
+                id="access-id"
+                type="text"
+                placeholder="your-role-id"
+                value={credentials.accessId}
+                onChange={(e) => onCredentialChange('accessId', e.target.value)}
+                className="w-80 pr-10"
+                style={{
+                  fontFamily: showRoleId ? 'inherit' : 'monospace',
+                  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                  // @ts-ignore
+                  WebkitTextSecurity: showRoleId ? 'none' : 'disc'
+                } as React.CSSProperties}
+              />
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100"
+                onClick={() => setShowRoleId(!showRoleId)}
+              >
+                {showRoleId ? (
+                  <EyeOff className="h-4 w-4 text-gray-500" />
+                ) : (
+                  <Eye className="h-4 w-4 text-gray-500" />
+                )}
+              </Button>
+            </div>
           </div>
 
           <div className="space-y-3">
