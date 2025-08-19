@@ -20,6 +20,11 @@ interface VaultCredentials {
   secretKey: string; // Key name within the Kubernetes secret
 }
 
+interface UnwrapCredentials {
+  wrappedToken: string;
+  notificationEmail?: string;
+}
+
 // Custom hook for localStorage persistence
 function useLocalStorage(key: string, initialValue: string) {
   const [storedValue, setStoredValue] = useState<string>(initialValue);
@@ -60,6 +65,7 @@ export default function Home() {
 
   const [availableEndpoints, setAvailableEndpoints] = useState<string[]>(vaultEndpoints);
   const [availableNamespaces, setAvailableNamespaces] = useState<string[]>(['default']);
+  const [emailConfigured, setEmailConfigured] = useState<boolean>(false);
   const [endpoint, setEndpoint] = useState<string>('');
 
   // Use localStorage for non-sensitive fields
@@ -89,10 +95,16 @@ export default function Home() {
     login?: boolean;
     lookup?: boolean;
     logout?: boolean;
+    unwrap?: boolean;
     validateAccess?: boolean;
   }>({});
 
   const [token, setToken] = useState<string>('');
+
+  const [unwrapCredentials, setUnwrapCredentials] = useState<UnwrapCredentials>({
+    wrappedToken: '',
+    notificationEmail: ''
+  });
 
   // Load application config (title, endpoints, and namespaces) from server
   useEffect(() => {
@@ -103,6 +115,7 @@ export default function Home() {
           setAppTitle(response.data.config.title);
           setAvailableEndpoints(response.data.config.endpoints);
           setAvailableNamespaces(response.data.config.namespaces);
+          setEmailConfigured(response.data.config.email?.configured || false);
         }
       } catch (error) {
         console.warn('Failed to load config from server, using defaults:', error);
@@ -190,6 +203,40 @@ export default function Home() {
     }
   };
 
+  const handleUnwrapCredentialChange = (field: keyof UnwrapCredentials, value: string) => {
+    setUnwrapCredentials(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+  const testUnwrap = async () => {
+    if (!endpoint || !unwrapCredentials.wrappedToken) {
+      toast.error('Please fill in endpoint and wrapped token');
+      return;
+    }
+
+    setLoading(prev => ({ ...prev, unwrap: true }));
+    try {
+      const response = await axios.post('/api/vault/sys/wrapping/unwrap', {
+        endpoint: endpoint,
+        wrappedToken: unwrapCredentials.wrappedToken,
+        notificationEmail: unwrapCredentials.notificationEmail
+      });
+
+      showJsonToast('Token unwrapped successfully!', response.data);
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      const axiosError = error && typeof error === 'object' && 'response' in error
+        ? error as { response: { data: { error?: string } } }
+        : null;
+
+      toast.error('Unwrap failed: ' + (axiosError?.response?.data?.error || errorMessage));
+    } finally {
+      setLoading(prev => ({ ...prev, unwrap: false }));
+    }
+  };
+
   const testLogin = async () => {
     if (!endpoint || !credentials.accessId) {
       toast.error('Please fill in endpoint and access ID');
@@ -204,7 +251,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, login: true }));
     try {
-      const response = await axios.post('/api/vault/approle/login', {
+      const response = await axios.post('/api/vault/auth/approle/login', {
         endpoint: endpoint,
         accessId: credentials.accessId,
         authMethod: credentials.authMethod,
@@ -241,7 +288,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, lookup: true }));
     try {
-      const response = await axios.post('/api/vault/lookup', {
+      const response = await axios.post('/api/vault/auth/token/lookup-self', {
         endpoint: endpoint,
         token: token
       });
@@ -272,7 +319,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, logout: true }));
     try {
-      const response = await axios.post('/api/vault/revoke-self', {
+      await axios.post('/api/vault/auth/token/revoke-self', {
         endpoint: endpoint,
         token: token
       });
@@ -300,7 +347,7 @@ export default function Home() {
 
     setLoading(prev => ({ ...prev, validateAccess: true }));
     try {
-      const response = await axios.post('/api/vault/capabilities-self', {
+      const response = await axios.post('/api/vault/sys/capabilities-self', {
         endpoint: endpoint,
         token: token,
         secretPath: credentials.secretPath
@@ -351,13 +398,17 @@ export default function Home() {
                   k8sSecretName: credentials.k8sSecretName,
                   secretKey: credentials.secretKey
                 }}
+                unwrapCredentials={unwrapCredentials}
                 availableNamespaces={availableNamespaces}
                 onCredentialChange={handleInputChange}
+                onUnwrapCredentialChange={handleUnwrapCredentialChange}
                 onLogin={testLogin}
                 onLookup={testLookup}
                 onLogout={testLogout}
+                onUnwrap={testUnwrap}
                 loading={loading}
                 token={token}
+                emailConfigured={emailConfigured}
               />
 
               {/* Step 3: Permission Validation */}

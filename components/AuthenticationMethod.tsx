@@ -1,12 +1,9 @@
 'use client';
 
-import { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Eye, EyeOff, CheckCircle, XCircle } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { LoginTab } from '@/components/LoginTab';
+import { WrappingTab } from '@/components/WrappingTab';
 
 interface AuthenticationCredentials {
   authMethod: 'approle';
@@ -16,28 +13,40 @@ interface AuthenticationCredentials {
   secretKey: string; // Key name within the Kubernetes secret
 }
 
+interface UnwrapCredentials {
+  wrappedToken: string;
+  notificationEmail?: string;
+}
+
 interface AuthenticationMethodProps {
   credentials: AuthenticationCredentials;
+  unwrapCredentials: UnwrapCredentials;
   availableNamespaces: string[];
   onCredentialChange: (field: keyof AuthenticationCredentials, value: string) => void;
+  onUnwrapCredentialChange: (field: keyof UnwrapCredentials, value: string) => void;
   onLogin: () => void;
   onLookup: () => void;
   onLogout: () => void;
-  loading: { login?: boolean; lookup?: boolean; logout?: boolean };
+  onUnwrap: () => void;
+  loading: { login?: boolean; lookup?: boolean; logout?: boolean; unwrap?: boolean };
   token: string;
+  emailConfigured?: boolean;
 }
 
 export function AuthenticationMethod({
   credentials,
+  unwrapCredentials,
   availableNamespaces,
   onCredentialChange,
+  onUnwrapCredentialChange,
   onLogin,
   onLookup,
   onLogout,
+  onUnwrap,
   loading,
-  token
+  token,
+  emailConfigured = false
 }: AuthenticationMethodProps) {
-  const [showRoleId, setShowRoleId] = useState(false);
   return (
     <Card className="border-slate-200 shadow-sm hover:shadow-md transition-shadow duration-200">
       <CardHeader className="pb-4">
@@ -49,160 +58,35 @@ export function AuthenticationMethod({
         </CardTitle>
       </CardHeader>
       <CardContent>
-        <div className="space-y-6">
-          {/* 第一行: Authentication Type - 标签左侧，下拉框最右侧 */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="auth-type" className="min-w-[140px]">Authentication Type</Label>
-            <Select
-              value={credentials.authMethod}
-              onValueChange={(value) => onCredentialChange('authMethod', value)}
-            >
-              <SelectTrigger id="auth-type" className="w-64">
-                <SelectValue placeholder="Select authentication method" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="approle">AppRole</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        <Tabs defaultValue="login" className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="login">Login</TabsTrigger>
+            <TabsTrigger value="unwrap">Unwrap</TabsTrigger>
+          </TabsList>
 
-          {/* 第二行: Role ID - 标签左侧，输入框最右侧 */}
-          <div className="flex items-center justify-between">
-            <Label htmlFor="access-id" className="min-w-[140px]">Role ID</Label>
-            <div className="relative">
-              <Input
-                id="access-id"
-                type="text"
-                placeholder="your-role-id"
-                value={credentials.accessId}
-                onChange={(e) => onCredentialChange('accessId', e.target.value)}
-                className="w-80 pr-10"
-                style={{
-                  fontFamily: showRoleId ? 'inherit' : 'monospace',
-                  // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                  // @ts-ignore
-                  WebkitTextSecurity: showRoleId ? 'none' : 'disc'
-                } as React.CSSProperties}
-              />
-              <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0 hover:bg-gray-100"
-                onClick={() => setShowRoleId(!showRoleId)}
-              >
-                {showRoleId ? (
-                  <EyeOff className="h-4 w-4 text-gray-500" />
-                ) : (
-                  <Eye className="h-4 w-4 text-gray-500" />
-                )}
-              </Button>
-            </div>
-          </div>
+          <TabsContent value="login" className="mt-6">
+            <LoginTab
+              credentials={credentials}
+              availableNamespaces={availableNamespaces}
+              onCredentialChange={onCredentialChange}
+              onLogin={onLogin}
+              onLookup={onLookup}
+              onLogout={onLogout}
+              loading={loading}
+              token={token}
+            />
+          </TabsContent>
 
-          <div className="space-y-3">
-            <Label className="text-sm font-medium text-gray-700">Secret Key Reference</Label>
-            <div className="flex gap-4">
-              <div className="flex items-center gap-2 flex-1">
-                <Label htmlFor="k8s-namespace" className="min-w-[80px] text-sm">Namespace</Label>
-                <Select
-                  value={credentials.k8sNamespace}
-                  onValueChange={(value) => onCredentialChange('k8sNamespace', value)}
-                >
-                  <SelectTrigger className="flex-1">
-                    <SelectValue placeholder="Select namespace" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {availableNamespaces.map((namespace) => (
-                      <SelectItem key={namespace} value={namespace}>
-                        {namespace}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div className="flex items-center gap-2 flex-1">
-                <Label htmlFor="k8s-secret-name" className="min-w-[80px] text-sm">Secret Name</Label>
-                <Input
-                  id="k8s-secret-name"
-                  type="text"
-                  placeholder="vault-secrets"
-                  value={credentials.k8sSecretName}
-                  onChange={(e) => onCredentialChange('k8sSecretName', e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-
-              <div className="flex items-center gap-2 flex-1">
-                <Label htmlFor="secret-key" className="min-w-[80px] text-sm">Key of Secret</Label>
-                <Input
-                  id="secret-key"
-                  type="text"
-                  placeholder="secret-id"
-                  value={credentials.secretKey}
-                  onChange={(e) => onCredentialChange('secretKey', e.target.value)}
-                  className="flex-1"
-                />
-              </div>
-            </div>
-          </div>
-
-          {/* 按钮和状态在同一水平线 */}
-          <div className="flex justify-between items-center pt-4">
-            {/* 左侧: Token状态 */}
-            <div className="flex items-center gap-2">
-              {token ? (
-                <>
-                  <CheckCircle className="h-4 w-4 text-green-600" />
-                  <span className="text-sm text-green-700">Token Active</span>
-                </>
-              ) : (
-                <>
-                  <XCircle className="h-4 w-4 text-red-500" />
-                  <span className="text-sm text-red-500">No Token</span>
-                </>
-              )}
-            </div>
-            
-            {/* 右侧: 按钮组 */}
-            <div className="flex gap-2">
-              <Button
-                onClick={onLogin}
-                disabled={
-                  loading.login ||
-                  !credentials.k8sNamespace ||
-                  !credentials.k8sSecretName ||
-                  !credentials.secretKey
-                }
-                className="bg-blue-600 hover:bg-blue-700 text-white"
-              >
-                {loading.login && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
-                Login
-              </Button>
-
-              <Button
-                onClick={onLookup}
-                disabled={loading.lookup || !token}
-                className="bg-blue-500 hover:bg-blue-600 text-white border-blue-500"
-                variant="outline"
-              >
-                {loading.lookup && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
-                Lookup
-              </Button>
-
-              <Button
-                onClick={onLogout}
-                disabled={loading.logout || !token}
-                className="bg-red-600 hover:bg-red-700 text-white"
-                variant="destructive"
-              >
-                {loading.logout && <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2"></div>}
-                Logout
-              </Button>
-            </div>
-          </div>
-        </div>
+          <TabsContent value="unwrap" className="mt-6">
+            <WrappingTab
+              credentials={unwrapCredentials}
+              onCredentialChange={onUnwrapCredentialChange}
+              onUnwrap={onUnwrap}
+              loading={loading}
+              emailConfigured={emailConfigured}
+            />
+          </TabsContent>
+        </Tabs>
       </CardContent>
     </Card>
   );

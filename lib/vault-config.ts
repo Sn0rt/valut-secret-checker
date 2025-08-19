@@ -2,6 +2,9 @@ export interface AppConfig {
   title: string;
   endpoints: string[];
   namespaces: string[];
+  email: {
+    configured: boolean;
+  };
 }
 
 export interface ConfigResponse {
