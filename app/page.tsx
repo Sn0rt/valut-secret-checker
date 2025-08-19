@@ -217,11 +217,11 @@ export default function Home() {
 
       const result = response.data;
 
-      if (result.success && result.data?.token) {
-        setToken(result.data.token);
+      if (result.auth?.client_token) {
+        setToken(result.auth.client_token);
         toast.success('Login successful! Token retrieved.');
       } else {
-        toast.error('Login failed: ' + (result.error || 'Unknown error'));
+        toast.error('Login failed: No token received from Vault');
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -249,10 +249,10 @@ export default function Home() {
       });
 
       const result = response.data;
-      if (result.success) {
+      if (result.data) {
         showJsonToast('Token lookup successful!', result.data);
       } else {
-        toast.error('Token lookup failed: ' + (result.error || 'Unknown error'));
+        toast.error('Token lookup failed: No data received from Vault');
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -281,10 +281,10 @@ export default function Home() {
       });
 
       const result = response.data;
-      if (result.success) {
-        showJsonToast('Permission validation successful!', result.data);
+      if (result.capabilities) {
+        showJsonToast('Permission validation successful!', result);
       } else {
-        toast.error('Permission validation failed: ' + (result.error || 'Unknown error'));
+        toast.error('Permission validation failed: No capabilities data received from Vault');
       }
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';

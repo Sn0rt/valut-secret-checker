@@ -5,9 +5,9 @@ import { serverDebug, serverError } from '@/lib/server-logger';
 export async function POST(request: NextRequest) {
   const requestId = Math.random().toString(36).substring(7);
   const startTime = Date.now();
-  
+
   serverDebug(`[LOOKUP-${requestId}] Request started at ${new Date().toISOString()}`);
-  
+
   try {
     const body = await request.json();
     const { endpoint, token } = body;
@@ -49,31 +49,16 @@ export async function POST(request: NextRequest) {
       entityId: response.data.data?.entity_id ? `${response.data.data.entity_id.substring(0, 8)}...` : undefined
     });
 
-    const responseData = {
-      success: true,
-      data: {
-        id: response.data.data?.id,
-        accessor: response.data.data?.accessor,
-        creation_time: response.data.data?.creation_time,
-        expire_time: response.data.data?.expire_time,
-        ttl: response.data.data?.ttl,
-        renewable: response.data.data?.renewable,
-        policies: response.data.data?.policies,
-        entity_id: response.data.data?.entity_id,
-        display_name: response.data.data?.display_name
-      }
-    };
-
     const duration = Date.now() - startTime;
     serverDebug(`[LOOKUP-${requestId}] Request completed successfully in ${duration}ms`);
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(response.data);
 
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
     serverError(`[LOOKUP-${requestId}] Request failed after ${duration}ms:`, errorMessage);
-    
+
     if (error && typeof error === 'object' && 'response' in error) {
       const axiosError = error as { response: { status: number; statusText: string; data: unknown } };
       serverDebug(`[LOOKUP-${requestId}] Axios error details:`, {
@@ -81,7 +66,7 @@ export async function POST(request: NextRequest) {
         statusText: axiosError.response.statusText,
         data: axiosError.response.data
       });
-      
+
       return NextResponse.json({
         success: false,
         error: `Token lookup failed: ${axiosError.response.status} ${axiosError.response.statusText}`,

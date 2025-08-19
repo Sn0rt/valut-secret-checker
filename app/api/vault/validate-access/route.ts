@@ -54,10 +54,7 @@ export async function POST(request: NextRequest) {
     const duration = Date.now() - startTime;
     serverDebug(`[VALIDATE-${requestId}] Request completed successfully in ${duration}ms`);
 
-    return NextResponse.json({
-      success: true,
-      data: response.data
-    });
+    return NextResponse.json(response.data);
 
   } catch (error: unknown) {
     const duration = Date.now() - startTime;

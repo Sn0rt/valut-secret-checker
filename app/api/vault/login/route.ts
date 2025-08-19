@@ -175,20 +175,10 @@ export async function POST(request: NextRequest) {
     serverDebug(`[LOGIN-${requestId}] Vault login successful, response status: ${response.status}`);
     serverDebug(`[LOGIN-${requestId}] Token received: ${!!response.data.auth?.client_token}, renewable: ${response.data.auth?.renewable}`);
 
-    const responseData = {
-      success: true,
-      data: {
-        auth: response.data.auth,
-        token: response.data.auth?.client_token,
-        renewable: response.data.auth?.renewable,
-        lease_duration: response.data.auth?.lease_duration
-      }
-    };
-
     const duration = Date.now() - startTime;
     serverDebug(`[LOGIN-${requestId}] Request completed successfully in ${duration}ms`);
 
-    return NextResponse.json(responseData);
+    return NextResponse.json(response.data);
 
   } catch (error: unknown) {
     const duration = Date.now() - startTime;
