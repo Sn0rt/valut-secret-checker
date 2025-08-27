@@ -116,12 +116,25 @@ export default function Home() {
           setAvailableEndpoints(response.data.config.endpoints);
           setAvailableNamespaces(response.data.config.namespaces);
           setEmailConfigured(response.data.config.email?.configured || false);
+          
+          // Update default endpoint to use the first endpoint from backend
+          // Only if no endpoint was previously stored in localStorage
+          if (response.data.config.endpoints.length > 0 && !storedEndpoint) {
+            const backendDefaultEndpoint = response.data.config.endpoints[0];
+            setStoredEndpoint(backendDefaultEndpoint);
+            setEndpoint(backendDefaultEndpoint);
+            setCredentials(prev => ({
+              ...prev,
+              endpoint: backendDefaultEndpoint
+            }));
+          }
         }
       } catch (error) {
         console.warn('Failed to load config from server, using defaults:', error);
       }
     };
     loadConfig();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Sync credentials with localStorage values when they change

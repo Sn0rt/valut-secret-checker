@@ -14,6 +14,7 @@ interface UnwrapNotificationData {
   success: boolean;
   userAgent?: string;
   ipAddress?: string;
+  response?: unknown;
 }
 
 interface EmailSendResult {
@@ -22,16 +23,43 @@ interface EmailSendResult {
   details: string[];
 }
 
+interface NetworkError extends Error {
+  code?: string;        // Error codes like ESOCKET, ECONNREFUSED, EDNS, etc.
+  errno?: number;       // Error number
+  syscall?: string;     // System call
+  hostname?: string;    // Hostname
+  address?: string;     // IP address  
+  port?: number;        // Port number
+  command?: string;     // SMTP command
+}
+
+// Helper function to safely get error code
+function getErrorCode(error: unknown): string {
+  if (error && typeof error === 'object' && 'code' in error) {
+    return String(error.code) || 'Unknown error';
+  }
+  return 'Unknown error';
+}
+
+// Helper function to safely get error message
+function getErrorMessage(error: unknown): string {
+  if (error && typeof error === 'object' && 'message' in error) {
+    return String(error.message);
+  }
+  return 'Unknown error';
+}
+
 // Check if SMTP is configured
 export function isSmtpConfigured(): boolean {
-  return !!process.env.SMTP_HOST && 
-         process.env.SMTP_HOST !== 'smtp.example.com';
+  return !!process.env.SMTP_HOST &&
+    process.env.SMTP_HOST !== 'smtp.example.com' &&
+    process.env.SMTP_HOST !== 'xxx.example.com'; // Add invalid example hostname
 }
 
 // Parse multiple email addresses (support comma and space separators)
 export function parseEmailAddresses(emailString: string): string[] {
   if (!emailString) return [];
-  
+
   return emailString
     .split(/[,\s]+/)
     .map(email => email.trim())
@@ -44,7 +72,16 @@ function createTransporter() {
     host: process.env.SMTP_HOST || 'localhost',
     port: parseInt(process.env.SMTP_PORT || '25'),
     secure: process.env.SMTP_SECURE === 'true', // true for SSL/TLS
-    auth: undefined as { user: string; pass: string } | undefined
+    auth: undefined as { user: string; pass: string } | undefined,
+    // For debugging servers, disable some checks
+    ignoreTLS: true,
+    requireTLS: false,
+    // Add debugging and timeout options
+    debug: process.env.DEBUG === 'true',
+    logger: process.env.DEBUG === 'true',
+    connectionTimeout: 10000, // 10 seconds
+    greetingTimeout: 5000,    // 5 seconds
+    socketTimeout: 10000      // 10 seconds
   };
 
   // Add authentication if credentials are provided
@@ -74,6 +111,17 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     }
 
     const transporter = createTransporter();
+
+    // Test connection first
+    serverDebug('Testing SMTP connection...');
+    try {
+      await transporter.verify();
+      serverDebug('SMTP connection verified successfully');
+    } catch (verifyError) {
+      serverError('SMTP connection verification failed:', verifyError);
+      // Try to continue anyway, sometimes verify() fails but sendMail works
+    }
+
     const fromEmail = process.env.SMTP_FROM_EMAIL || 'noreply@example.com';
 
     const mailOptions = {
@@ -91,7 +139,7 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
     });
 
     const result = await transporter.sendMail(mailOptions);
-    
+
     serverDebug('Email sent successfully:', {
       messageId: result.messageId,
       to: options.to
@@ -99,7 +147,11 @@ export async function sendEmail(options: EmailOptions): Promise<boolean> {
 
     return true;
   } catch (error) {
-    serverError('Failed to send email:', error);
+    serverError('Failed to send email:', {
+      to: options.to,
+      subject: options.subject,
+      error: getErrorCode(error)
+    });
     return false;
   }
 }
@@ -124,7 +176,7 @@ export async function sendUnwrapNotification(
 
   // Parse email addresses
   const emails = parseEmailAddresses(emailString);
-  
+
   if (emails.length === 0) {
     serverDebug('No valid email addresses found');
     result.details.push('No valid email addresses found');
@@ -134,9 +186,14 @@ export async function sendUnwrapNotification(
   serverDebug(`Sending unwrap notification to ${emails.length} recipients:`, emails);
 
   const subject = `Token Unwrap Notification - ${data.success ? 'Success' : 'Failed'}`;
-  
-  const textContent = `
-Token Unwrap Notification
+
+  // Get configurable app title
+  const appTitle = process.env.NEXT_PUBLIC_APP_TITLE || 'Vault Secret Checker';
+
+  // Format response data for display
+  const responseData = data.response ? JSON.stringify(data.response, null, 2) : 'No response data available';
+
+  const textContent = `Token Unwrap Notification
 
 Status: ${data.success ? 'SUCCESS' : 'FAILED'}
 Timestamp: ${data.timestamp}
@@ -144,58 +201,10 @@ Endpoint: ${data.endpoint}
 User Agent: ${data.userAgent || 'Unknown'}
 IP Address: ${data.ipAddress || 'Unknown'}
 
-This notification was generated automatically by the Vault Secret Checker system.
-`;
+Response Data:
+${responseData}
 
-  const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="utf-8">
-    <title>Token Unwrap Notification</title>
-    <style>
-        body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-        .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-        .header { background-color: ${data.success ? '#10b981' : '#ef4444'}; color: white; padding: 20px; border-radius: 8px; text-align: center; }
-        .content { background-color: #f8f9fa; padding: 20px; border-radius: 8px; margin-top: 20px; }
-        .info-row { display: flex; justify-content: space-between; margin-bottom: 10px; }
-        .label { font-weight: bold; }
-        .footer { margin-top: 20px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 12px; color: #6c757d; }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="header">
-            <h2>Token Unwrap Notification</h2>
-            <p>Status: ${data.success ? 'SUCCESS' : 'FAILED'}</p>
-        </div>
-        
-        <div class="content">
-            <div class="info-row">
-                <span class="label">Timestamp:</span>
-                <span>${data.timestamp}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">Endpoint:</span>
-                <span>${data.endpoint}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">User Agent:</span>
-                <span>${data.userAgent || 'Unknown'}</span>
-            </div>
-            <div class="info-row">
-                <span class="label">IP Address:</span>
-                <span>${data.ipAddress || 'Unknown'}</span>
-            </div>
-        </div>
-        
-        <div class="footer">
-            <p>This notification was generated automatically by the Vault Secret Checker system.</p>
-        </div>
-    </div>
-</body>
-</html>
-`;
+This notification was generated automatically by the ${appTitle} system.`;
 
   // Send email to each recipient
   for (const email of emails) {
@@ -203,10 +212,9 @@ This notification was generated automatically by the Vault Secret Checker system
       const success = await sendEmail({
         to: email,
         subject,
-        text: textContent,
-        html: htmlContent
+        text: textContent
       });
-      
+
       if (success) {
         result.success++;
         result.details.push(`Successfully sent to ${email}`);
@@ -228,12 +236,21 @@ This notification was generated automatically by the Vault Secret Checker system
 // Test email configuration
 export async function testEmailConfiguration(): Promise<boolean> {
   try {
+    serverDebug('Testing email configuration...');
+
     const transporter = createTransporter();
+
+    // First test the connection
+    serverDebug('Verifying SMTP connection...');
     await transporter.verify();
+
     serverDebug('SMTP configuration is valid');
     return true;
   } catch (error) {
-    serverError('SMTP configuration test failed:', error);
+    serverError('SMTP configuration test failed:', {
+      errorCode: getErrorCode(error),
+      errorMessage: getErrorMessage(error)
+    });
     return false;
   }
 }

@@ -9,15 +9,18 @@ export async function POST(request: NextRequest) {
 
   serverDebug(`[UNWRAP-${requestId}] Request started at ${new Date().toISOString()}`);
 
+  let notificationEmail = ''; // Store this at the top level for error handling
+
   try {
     const body = await request.json();
-    const { endpoint, wrappedToken, notificationEmail } = body;
+    const { endpoint, wrappedToken, notificationEmail: bodyNotificationEmail } = body;
+    notificationEmail = bodyNotificationEmail; // Store for error handling
 
     serverDebug(`[UNWRAP-${requestId}] Request parameters:`, {
       endpoint,
       hasWrappedToken: !!wrappedToken,
       wrappedTokenLength: wrappedToken ? wrappedToken.length : 0,
-      notificationEmail,
+      notificationEmail: bodyNotificationEmail,
       hasBody: !!body
     });
 
@@ -67,7 +70,8 @@ export async function POST(request: NextRequest) {
         userAgent: request.headers.get('user-agent') || undefined,
         ipAddress: request.headers.get('x-forwarded-for') || 
                   request.headers.get('x-real-ip') || 
-                  'unknown'
+                  'unknown',
+        response: response.data // Include the actual response data
       }).catch(error => {
         serverError(`[UNWRAP-${requestId}] Failed to send notification email:`, error);
       });
@@ -88,11 +92,51 @@ export async function POST(request: NextRequest) {
         data: axiosError.response.data
       });
 
+      // Send failure notification email if provided
+      if (notificationEmail) {
+        sendUnwrapNotification(notificationEmail, {
+          timestamp: new Date().toISOString(),
+          endpoint: request.url,
+          success: false,
+          userAgent: request.headers.get('user-agent') || undefined,
+          ipAddress: request.headers.get('x-forwarded-for') || 
+                    request.headers.get('x-real-ip') || 
+                    'unknown',
+          response: {
+            error: `Token unwrap failed: ${axiosError.response.status} ${axiosError.response.statusText}`,
+            details: axiosError.response.data,
+            status: axiosError.response.status,
+            statusText: axiosError.response.statusText
+          }
+        }).catch(emailError => {
+          serverError(`[UNWRAP-${requestId}] Failed to send failure notification email:`, emailError);
+        });
+      }
+
       return NextResponse.json({
         success: false,
         error: `Token unwrap failed: ${axiosError.response.status} ${axiosError.response.statusText}`,
         details: axiosError.response.data
       }, { status: axiosError.response.status });
+    }
+
+    // Send failure notification email for network errors
+    if (notificationEmail) {
+      sendUnwrapNotification(notificationEmail, {
+        timestamp: new Date().toISOString(),
+        endpoint: request.url,
+        success: false,
+        userAgent: request.headers.get('user-agent') || undefined,
+        ipAddress: request.headers.get('x-forwarded-for') || 
+                  request.headers.get('x-real-ip') || 
+                  'unknown',
+        response: {
+          error: `Network error: ${errorMessage}`,
+          type: 'network_error'
+        }
+      }).catch(emailError => {
+        serverError(`[UNWRAP-${requestId}] Failed to send failure notification email:`, emailError);
+      });
     }
 
     return NextResponse.json({

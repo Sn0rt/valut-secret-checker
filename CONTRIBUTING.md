@@ -5,6 +5,7 @@ This document provides information for developers who want to contribute to or w
 ## Development Setup
 
 ### Prerequisites
+
 - Node.js (version 16 or higher)
 - npm or yarn
 - Docker (for containerized deployment)
@@ -13,18 +14,24 @@ This document provides information for developers who want to contribute to or w
 
 1. Clone the repository
 2. Install dependencies:
+
    ```bash
    npm install
    ```
+
 3. Create `.env.local` for development:
+
    ```env
    VAULT_ENDPOINTS=http://localhost:8200,https://vault.example.com
    APP_TITLE="Vault Secret Checker"
    ```
+
 4. Run the development server:
+
    ```bash
    npm run dev
    ```
+
 5. Open `http://localhost:3000`
 
 ## Project Structure
@@ -63,23 +70,27 @@ The application provides API endpoints that proxy Vault operations:
 ## Development Workflow
 
 ### Code Style
+
 - Follow the existing code conventions
 - Use TypeScript for type safety
 - Run `npm run lint` before committing
 
 ### Architecture Overview
+
 - **Frontend**: Next.js with React components
 - **API Layer**: Next.js API routes that proxy Vault requests
 - **Styling**: Tailwind CSS with shadcn/ui components
 - **State Management**: React hooks and context
 
 ### Key Components
+
 - `AuthenticationMethod.tsx`: Handles AppRole authentication
 - `PermissionValidation.tsx`: Tests secret path permissions
 - `WrappingTab.tsx`: Token wrapping/unwrapping functionality
 - `EndpointList.tsx`: Vault endpoint selection
 
 ### Security Considerations
+
 - Never store secrets in localStorage
 - All Vault communications are proxied through API routes
 - Input validation on all forms
@@ -88,6 +99,7 @@ The application provides API endpoints that proxy Vault operations:
 ## Testing
 
 Run tests with:
+
 ```bash
 npm test
 ```
