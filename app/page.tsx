@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import axios from 'axios';
 import { toast } from 'sonner';
 import JsonView from '@uiw/react-json-view';
@@ -33,11 +33,23 @@ interface UnwrapCredentials {
 
 // Custom hook for localStorage persistence
 function useLocalStorage(key: string, initialValue: string) {
-  const [storedValue, setStoredValue] = useState<string>(() => {
-    if (typeof window === 'undefined') {
-      return initialValue;
-    }
+  const subscribe = useCallback((onStoreChange: () => void) => {
+    const handleStorageChange = (event: StorageEvent) => {
+      if (event.key === key) {
+        onStoreChange();
+      }
+    };
 
+    window.addEventListener('storage', handleStorageChange);
+    window.addEventListener(`local-storage:${key}`, onStoreChange);
+
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+      window.removeEventListener(`local-storage:${key}`, onStoreChange);
+    };
+  }, [key]);
+
+  const getSnapshot = useCallback(() => {
     try {
       const item = window.localStorage.getItem(key);
       return item ?? initialValue;
@@ -45,14 +57,15 @@ function useLocalStorage(key: string, initialValue: string) {
       console.warn(`Error reading localStorage key "${key}":`, error);
       return initialValue;
     }
-  });
+  }, [key, initialValue]);
+
+  const getServerSnapshot = useCallback(() => initialValue, [initialValue]);
+  const storedValue = useSyncExternalStore(subscribe, getSnapshot, getServerSnapshot);
 
   const setValue = useCallback((value: string) => {
     try {
-      setStoredValue(value);
-      if (typeof window !== 'undefined') {
-        window.localStorage.setItem(key, value);
-      }
+      window.localStorage.setItem(key, value);
+      window.dispatchEvent(new Event(`local-storage:${key}`));
     } catch (error) {
       console.warn(`Error setting localStorage key "${key}":`, error);
     }
@@ -175,7 +188,7 @@ export default function Home() {
               style={{
                 backgroundColor: 'transparent',
                 fontSize: '12px',
-                '--w-rjv-font-family': 'var(--font-geist-mono), Monaco, Menlo, monospace',
+                '--w-rjv-font-family': 'monospace',
                 '--w-rjv-color-default': '#374151',
                 '--w-rjv-color-string': '#059669',
                 '--w-rjv-color-number': '#dc2626',
